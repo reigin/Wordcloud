@@ -1,7 +1,66 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <title>Word Cloud Generator</title>
+
+<script src="lib/jQuery.v3.2.1.min.js"></script>
+
+  <link rel="stylesheet" href="lib/jquery-ui.css">
+  <link rel="stylesheet" href="lib/style.css">
+<!--
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+-->
+  <script src="lib/jquery-ui.js"></script>
+  
 <style>
+  .ui-tooltip, .arrow:after {
+    background: black;
+    border: 2px solid white;
+  }
+  .ui-tooltip {
+    padding: 10px 20px;
+    color: white;
+    border-radius: 20px;
+    font: bold 14px "Helvetica Neue", Sans-Serif;
+    text-transform: uppercase;
+    box-shadow: 0 0 7px black;
+  }
+  .arrow {
+    width: 70px;
+    height: 16px;
+    overflow: hidden;
+    position: absolute;
+    left: 50%;
+    margin-left: -35px;
+    bottom: -16px;
+  }
+  .arrow.top {
+    top: -16px;
+    bottom: auto;
+  }
+  .arrow.left {
+    left: 20%;
+  }
+  .arrow:after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: -20px;
+    width: 25px;
+    height: 25px;
+    box-shadow: 6px 5px 9px -9px black;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+  }
+  .arrow.top:after {
+    bottom: -20px;
+    top: auto;
+  }
+  </style>
+<style>
+label {
+	width: 5em;
+}
 body {
   position: relative;
   font-family: "Helvetica Neue", sans-serif;
@@ -36,52 +95,47 @@ a.active { text-decoration: none; color: #000; font-weight: bold; cursor: text; 
 <div style="text-align: center">
   <div id="presets"></div>
   <div id="custom-area">
-    <p><label for="text">Paste your text below!</label>
-    <p><textarea id="text">
-How the Word Cloud Generator Works
-
-The layout algorithm for positioning words without overlap is available on GitHub under an open source license as d3-cloud. Note that this is the only the layout algorithm and any code for converting text into words and rendering the final output requires additional development.
-
-As word placement can be quite slow for more than a few hundred words, the layout algorithm can be run asynchronously, with a configurable time step size. This makes it possible to animate words as they are placed without stuttering. It is recommended to always use a time step even without animations as it prevents the browser’s event loop from blocking while placing the words.
-
-The layout algorithm itself is incredibly simple. For each word, starting with the most “important”:
-
-Attempt to place the word at some starting point: usually near the middle, or somewhere on a central horizontal line.
-If the word intersects with any previously placed words, move it one step along an increasing spiral. Repeat until no intersections are found.
-The hard part is making it perform efficiently! According to Jonathan Feinberg, Wordle uses a combination of hierarchical bounding boxes and quadtrees to achieve reasonable speeds.
-
-Glyphs in JavaScript
-
-There isn’t a way to retrieve precise glyph shapes via the DOM, except perhaps for SVG fonts. Instead, we draw each word to a hidden canvas element, and retrieve the pixel data.
-
-Retrieving the pixel data separately for each word is expensive, so we draw as many words as possible and then retrieve their pixels in a batch operation.
-
-Sprites and Masks
-
-My initial implementation performed collision detection using sprite masks. Once a word is placed, it doesn't move, so we can copy it to the appropriate position in a larger sprite representing the whole placement area.
-
-The advantage of this is that collision detection only involves comparing a candidate sprite with the relevant area of this larger sprite, rather than comparing with each previous word separately.
-
-Somewhat surprisingly, a simple low-level hack made a tremendous difference: when constructing the sprite I compressed blocks of 32 1-bit pixels into 32-bit integers, thus reducing the number of checks (and memory) by 32 times.
-
-In fact, this turned out to beat my hierarchical bounding box with quadtree implementation on everything I tried it on (even very large areas and font sizes). I think this is primarily because the sprite version only needs to perform a single collision test per candidate area, whereas the bounding box version has to compare with every other previously placed word that overlaps slightly with the candidate area.
-
-Another possibility would be to merge a word’s tree with a single large tree once it is placed. I think this operation would be fairly expensive though compared with the analagous sprite mask operation, which is essentially ORing a whole block.
-
+    <p><textarea id="text" style="display:block">
     </textarea>
-    <button id="go" type="submit">Go!</button>
+	<button title='gogo' id="go" type="submit">Go!</button>
   </div>
 </div>
 
 <hr>
 
+
+<form action="" method="post">
+	Pilih POI : <select id="myselect" name="myselect" ><option selected="">-</option></select>
+	<br>
+	Pilih Tipe : <select id="myselectTipe" name="myselectTipe" ><option selected="">-</option></select>
+	<br>
+	Pilih Lokasi Reviewer : <select id="myselectLokasi" name="myselectLokasi" ><option selected="">-</option></select>
+	
+	<p>
+		<label for="lat">Lokasi Reviewer Latitude :</label>
+		<input type="text" id="lat" readonly style="border:0; color:#f6931f; font-weight:bold;">
+	</p>
+	<div id="slider-range-lat"></div>
+	<p>
+		<label for="long">Lokasi Reviewer Longitude :</label>
+		<input type="text" id="long" readonly style="border:0; color:#f6931f; font-weight:bold;">
+	</p>
+	<div id="slider-range-long"></div>
+	Pilih Rank : 
+	<select id="myselectrank" name="myselectrank" >
+		<option selected="1">1</option>
+		<option selected="2">2</option>
+		<option selected="3">3</option>
+		<option selected="4">4</option>
+		<option selected="5">5</option>
+	</select>
+
+</form>
+
+            
 <div style="float: right; text-align: right">
   <p><label for="max">Number of words:</label> <input type="number" value="250" min="1" id="max">
   <p><label for="per-line"><input type="checkbox" id="per-line"> One word per line</label>
-  <!--<p><label for="colours">Colours:</label> <a href="#" id="random-palette">get random palette</a>-->
-  <p><label>Download:</label>
-    <button id="download-svg">SVG</button><!-- |
-    <a id="download-png" href="#">PNG</a>-->
 </div>
 
 <div style="float: left">
@@ -103,10 +157,25 @@ Another possibility would be to merge a word’s tree with a single large tree o
 
 <hr style="clear: both">
 
-<p style="float: right"><a href="http://www.google.com">Tugas BESAR</a>
-<p style="float: left">Supported by <a href="http://www.jasondavies.com/">Jason Davies</a> | Tugas Visdat Kelompok 3
+<p style="float: right"><a href="about/">Tugas BESAR</a>.
+<p style="float: left"><a href="http://www.jasondavies.com/">First Source</a> | <a href="http://www.google.com">Kelompok 3</a>. The generated word clouds may be used for education purpose.
+
+    <p><textarea id="textquery" style="display:block">
+    </textarea>
 
 </form>
 
-<script src="d3.min.js"></script>
-<script src="cloud.min.js"></script>
+<script src="kel3.js"></script>
+
+<script src="lib/d3.min.js"></script>
+<script src="lib/cloud.min.js"></script>
+
+<!--
+<link rel="stylesheet" href="bootstrap.min.css">
+
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<link rel="stylesheet" href="https://jqueryui.com/jquery-wp-content/themes/jqueryui.com/style.css">
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+-->
+
